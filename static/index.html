@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong</title>
+    <style>
+        * {
+            color: white;
+            padding: 0;
+            margin: 0;
+        }
+
+        canvas {border: 1px solid white}
+
+        html {
+            background: black;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        body {
+            min-width: 1280px;
+            min-height: 100vh;;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="screen"></canvas>
+    <script>
+        "use strict";
+        const cid = "screen";
+        const canvas = document.getElementById(cid);
+        const ctx = canvas.getContext("2d");
+
+        // game vars
+        const CANVAS_WIDTH = 1280;
+        const CANVAS_HEIGHT = 720;
+
+        let players = [];
+
+        class Player {
+            wsid;
+            rectheight = 10;
+            rectwidth = 100;
+            constructor(x, y) {
+                this.x = x;
+                this.y = (y - this.rectwidth)/2;
+            }
+
+            set current(id) {
+                this.wsid = id;
+            }
+        }
+
+        const ws = new WebSocket("ws://localhost:8080/ws");
+        if (!ws) {
+            console.error("cannot get websocket connection");
+        }
+        
+        ws.onopen = function() {
+            console.log("websocket connection opened properly");
+            draw();
+        }
+
+        ws.onmessage = function(evt) {
+            const data = JSON.parse(evt.data);
+            switch (data.action) {
+                case "PLAYER_IN": {
+                    const {connections, message} = data.content;
+                    console.log(data.content.message);
+                    if (connections == 2) {
+                        // TODO: assign which connection to player class
+                        players = [new Player(10, CANVAS_HEIGHT), new Player(CANVAS_WIDTH-20, CANVAS_HEIGHT)];
+                        players.forEach(p => {
+                            createplayer(p);
+                        });
+                    }
+                    break;
+                }
+                case "PLAYER_OUT": {
+                    const {connections, message} = data.content;
+                    console.log(data.content.message)
+                    clearplayers(players);
+                    break;
+                }
+                default:
+                    return;
+            }
+        }
+
+        // TODO: handle key hold instead of only detecting 1 press only
+        window.addEventListener("keydown", (event) => {
+            if (event.defaultPrevented) {
+                return;
+            }
+
+            switch (event.key) {
+                case "ArrowUp":
+                    ws.send("ArrowUp");
+                    break;
+                case "ArrowDown":
+                    ws.send("ArrowDown");
+                    break;
+                default:
+                    return;
+            }
+        })
+
+        function createplayer(player) {
+            ctx.beginPath();
+            ctx.fillStyle = "#FFFFFF";
+            // TODO: set the width of the player height rect to be adjustable from server
+            ctx.rect(player.x, player.y, player.rectheight, player.rectwidth); 
+            ctx.fill();
+        }
+
+        function clearplayers(players) {
+            players.forEach(p => {
+                ctx.clearRect(p.x, p.y, p.rectheight, p.rectwidth);
+            });
+            players = [];
+        }
+
+        function draw() {
+            if (!canvas.getContext) {
+                console.error("cannot get canvas with id " + cid);
+            }
+
+            canvas.width = CANVAS_WIDTH;
+            canvas.height = CANVAS_HEIGHT; 
+
+            ctx.setLineDash([5, 15]);
+            ctx.beginPath();
+            ctx.moveTo(0,100);
+            ctx.stroke();
+            ctx.strokeStyle = "#FFFFFF";
+            ctx.lineWidth = 2; 
+            ctx.strokeRect(CANVAS_WIDTH/2, 0, 0, CANVAS_HEIGHT-2);
+        }
+    </script>
+</body>
+</html>
