@@ -16,10 +16,16 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
+type PlayerState struct {
+	X int `json:"x"`
+	Y int `json:"y"`
+}
+
 type client struct {
-	hub  *hub
-	conn *websocket.Conn
-	send chan []byte
+	hub         *hub
+	conn        *websocket.Conn
+	send        chan []byte
+	playerState *PlayerState
 }
 
 func (c *client) read() {
@@ -36,7 +42,26 @@ func (c *client) read() {
 			}
 			break
 		}
+
 		message = bytes.TrimSpace(bytes.Replace(message, []byte{'\n'}, []byte{' '}, -1))
+		var payload Message
+		err = json.Unmarshal(message, &payload)
+		if err != nil {
+			log.Printf("error unmarshaling message: %v", err)
+			break
+		}
+
+		switch payload.Action {
+		case "MOVE_UP":
+			if c.playerState.Y-1 >= 0 {
+				c.playerState.Y -= 1
+			}
+		case "MOVE_DOWN":
+			if (c.playerState.Y+RECT_WIDTH)+1 <= GAME_HEIGHT {
+				c.playerState.Y += 1
+			}
+		}
+
 		c.hub.broadcast <- message
 	}
 }
@@ -77,12 +102,12 @@ func (c *client) write() {
 	}
 }
 
-func (c *client) sendmsg(msg message) error {
+func (c *client) sendmsg(msg Message) error {
 	j, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("error while marshaling json %v", err)
 	}
-	c.send <- j
+	c.hub.broadcast <- j
 	return nil
 }
 

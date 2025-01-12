@@ -45,21 +45,20 @@
         const CANVAS_WIDTH = 1280;
         const CANVAS_HEIGHT = 720;
 
-        let players = [];
-
         class Player {
-            wsid;
             rectheight = 10;
             rectwidth = 100;
-            constructor(x, y) {
+            constructor(x, y, part) {
                 this.x = x;
-                this.y = (y - this.rectwidth)/2;
+                this.y = y;
             }
 
-            set current(id) {
-                this.wsid = id;
+            set setY(id) {
+                this.y = y;
             }
         }
+
+        let players = [];
 
         const ws = new WebSocket("ws://localhost:8080/ws");
         if (!ws) {
@@ -67,70 +66,82 @@
         }
         
         ws.onopen = function() {
-            console.log("websocket connection opened properly");
-            draw();
+            draw_arena();
         }
 
         ws.onmessage = function(evt) {
             const data = JSON.parse(evt.data);
             switch (data.action) {
-                case "PLAYER_IN": {
-                    const {connections, message} = data.content;
-                    console.log(data.content.message);
-                    if (connections == 2) {
-                        // TODO: assign which connection to player class
-                        players = [new Player(10, CANVAS_HEIGHT), new Player(CANVAS_WIDTH-20, CANVAS_HEIGHT)];
-                        players.forEach(p => {
-                            createplayer(p);
-                        });
-                    }
-                    break;
-                }
-                case "PLAYER_OUT": {
-                    const {connections, message} = data.content;
-                    console.log(data.content.message)
-                    clearplayers(players);
-                    break;
-                }
+                case "GAME_START":
+                    // TODO: startgame()
+                    console.log("Game is starting")
+                case "UPDATE_FRAME":
+                    let temp; // to keep track of the previous y coordinate
+                    temp = players;
+                    players = [];
+                    const { players_state } = data.content;
+                    players_state.forEach(p => {
+                        players.push(new Player(p.x, p.y)) 
+                        draw_player(p.x, p.y, temp)
+                    });
                 default:
                     return;
             }
         }
 
         // TODO: handle key hold instead of only detecting 1 press only
+        let direction;
+        let movingtimeout = -1;
+        window.addEventListener("keyup", () => {
+            stopmoving();
+        })
         window.addEventListener("keydown", (event) => {
-            if (event.defaultPrevented) {
-                return;
-            }
-
             switch (event.key) {
                 case "ArrowUp":
-                    ws.send("ArrowUp");
+                    direction = "UP";
                     break;
                 case "ArrowDown":
-                    ws.send("ArrowDown");
+                    direction = "DOWN";
                     break;
                 default:
                     return;
             }
+
+            if (direction) {
+                startmoving(direction)
+            }
         })
 
-        function createplayer(player) {
+        function loop(direction) {
+            const dir = { action: `MOVE_${direction}`, content: null};
+            ws.send(JSON.stringify(dir));
+            movingtimeout = setTimeout(loop, 1000/60, direction);
+        }
+
+        function startmoving(direction) {
+            if (movingtimeout === -1) {
+                loop(direction);
+            }
+        }
+
+        function stopmoving() {
+            clearTimeout(movingtimeout);
+            movingtimeout = -1;
+        }
+
+        function draw_player(x, y, temp) {
+            const curr = temp.find(player => player.x === x);
+            if (!curr) {
+                return;
+            }
             ctx.beginPath();
+            ctx.rect(x, y, curr.rectheight, curr.rectwidth); 
+            ctx.clearRect(curr.x, curr.y, curr.rectheight, curr.rectwidth);
             ctx.fillStyle = "#FFFFFF";
-            // TODO: set the width of the player height rect to be adjustable from server
-            ctx.rect(player.x, player.y, player.rectheight, player.rectwidth); 
             ctx.fill();
         }
 
-        function clearplayers(players) {
-            players.forEach(p => {
-                ctx.clearRect(p.x, p.y, p.rectheight, p.rectwidth);
-            });
-            players = [];
-        }
-
-        function draw() {
+        function draw_arena() {
             if (!canvas.getContext) {
                 console.error("cannot get canvas with id " + cid);
             }
