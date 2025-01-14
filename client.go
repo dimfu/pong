@@ -21,6 +21,16 @@ type PlayerState struct {
 	Y int `json:"y"`
 }
 
+type BallState struct {
+	X        float64 `json:"x"`
+	Y        float64 `json:"y"`
+	Angle    float64 `json:"angle"`
+	Radius   float64 `json:"radius"`
+	Velocity float64 `json:"velocity"`
+	SpeedX   float64 `json:"speedX"`
+	SpeedY   float64 `json:"speedY"`
+}
+
 type client struct {
 	hub         *hub
 	conn        *websocket.Conn

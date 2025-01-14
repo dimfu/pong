@@ -58,6 +58,20 @@
             }
         }
 
+
+        class Ball {
+            constructor(x, y, part) {
+                this.x = x;
+                this.y = y;
+            }
+
+            updatePos(x, y) {
+                this.x = x;
+                this.y = y;
+            }
+        }
+
+        let ball;
         let players = [];
 
         const ws = new WebSocket("ws://localhost:8080/ws");
@@ -74,16 +88,22 @@
             switch (data.action) {
                 case "GAME_START":
                     // TODO: startgame()
-                    console.log("Game is starting")
                 case "UPDATE_FRAME":
+                    draw_center_line();
+                    const { players_state, ball_state } = data.content;
                     let temp; // to keep track of the previous y coordinate
                     temp = players;
                     players = [];
-                    const { players_state } = data.content;
+                    
                     players_state.forEach(p => {
                         players.push(new Player(p.x, p.y)) 
                         draw_player(p.x, p.y, temp)
                     });
+
+                    let prevball;
+                    prevball = ball;
+                    ball = new Ball(ball_state.x, ball_state.y);
+                    draw_ball(prevball, ball);
                 default:
                     return;
             }
@@ -115,7 +135,7 @@
         function loop(direction) {
             const dir = { action: `MOVE_${direction}`, content: null};
             ws.send(JSON.stringify(dir));
-            movingtimeout = setTimeout(loop, 1000/60, direction);
+            movingtimeout = setTimeout(loop, 1, direction);
         }
 
         function startmoving(direction) {
@@ -141,6 +161,17 @@
             ctx.fill();
         }
 
+        function draw_ball(prev, next) {
+            if (!prev) {
+                return;
+            }
+            ctx.clearRect(prev.x - 16, prev.y - 16, 32, 32);
+            ctx.beginPath();
+            ctx.arc(next.x, next.y, 15, 0, 2 * Math.PI);
+            ctx.fillStyle = "white";
+            ctx.fill();
+        }
+
         function draw_arena() {
             if (!canvas.getContext) {
                 console.error("cannot get canvas with id " + cid);
@@ -148,7 +179,10 @@
 
             canvas.width = CANVAS_WIDTH;
             canvas.height = CANVAS_HEIGHT; 
+            draw_center_line();
+        }
 
+        function draw_center_line() {
             ctx.setLineDash([5, 15]);
             ctx.beginPath();
             ctx.moveTo(0,100);
